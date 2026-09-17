@@ -1,0 +1,26 @@
+# Release allowlist: do not accidentally commit local session data.
+*
+!/docs/
+!/rules/
+!/src/
+!/tests/
+!/.gitignore
+!/INSTALL_PROMPT.md
+!/README.md
+!/SHA256SUMS
+!/VERSION
+!/apply_rules.py
+!/docs/RELEASE.md
+!/rules/AGENTS.fragment.md
+!/run_tests.py
+!/src/README.md
+!/src/install.py
+!/src/session_layout.py
+!/src/session_mirror.py
+!/tests/test_distribution.py
+!/tests/test_install.py
+!/tests/test_session_mirror.py
+!/verify_package.py
+!/src/archive_store.py
+!/tests/test_archive_store.py
+!/docs/ARCHIVING.md
