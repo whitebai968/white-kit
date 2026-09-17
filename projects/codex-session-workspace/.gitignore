@@ -24,3 +24,6 @@
 !/src/archive_store.py
 !/tests/test_archive_store.py
 !/docs/ARCHIVING.md
+!/src/fork_workspace.py
+!/tests/test_fork_workspace.py
+!/docs/FORKING.md

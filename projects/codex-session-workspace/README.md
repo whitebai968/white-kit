@@ -1,4 +1,4 @@
-# Codex Session Workspace v1.1.0
+# Codex Session Workspace v1.2.0
 
 在 Mac 上为每个本地 Codex session 自动维护一个同名工作区：原始历史、会话说明、用户资料、Agent 工作文件和用户保留成果放在一起。
 
@@ -9,6 +9,7 @@
 - [安装 / 独立重建提示词](INSTALL_PROMPT.md)
 - [完整运行说明](src/README.md)
 - [需合并的文件管理规则](rules/AGENTS.fragment.md)
+- [完整分叉与异常导航](docs/FORKING.md)
 - [ZIP 归档、恢复与异常处理](docs/ARCHIVING.md)
 - [版本说明与验证边界](docs/RELEASE.md)
 
@@ -27,7 +28,7 @@
    └─ 已归档 session 名称.zip
 ```
 
-每 2 秒检查一次。活跃 session 改名时移动整个工作区；归档时校验打包为 `已归档/<session名称>.zip`，成功后移除原文件夹；取消归档时恢复完整工作区；归档后改名时更新 ZIP 名称及包内顶层目录。分叉独立保存历史。源会话确认删除 15 秒后移除历史副本，已有用户资料和产物仍保留。同步进程不调用模型。
+每 2 秒检查一次。活跃 session 改名时移动整个工作区；归档时校验打包为 `已归档/<session名称>.zip`，成功后移除原文件夹；取消归档时恢复完整工作区；归档后改名时更新 ZIP 名称及包内顶层目录。新分叉一次性复制父工作区的资料、工作、成果、说明和索引，再独立维护；历史使用子会话原始记录。失败原因直接列在项目导航中，即使子目录尚未创建也可查看。源会话确认删除 15 秒后移除历史副本，已有用户资料和产物仍保留。同步进程不调用模型。
 
 聊天窗口的附件不会自动复制进 `资料/`；只有用户明确要求保存时才代为放入。处理后生成的内容放进 `工作/`。
 
@@ -38,7 +39,7 @@
 - macOS，Python 3.9 或更新版本；仅使用标准库，不需要 pip 依赖或 API key。
 - 本机 Codex 会话数据可读取。当前适配 `state_*.sqlite` 中的 threads 数据与原始 JSONL；必须在目标机先做只读检查。
 - 默认 profile 是 `~/.codex`；支持 `CODEX_HOME`，安装时可显式传 `--codex-home`。
-- 本版不提供 Windows 或 Linux 安装器。产品版本 `1.1.0` 与内部 `layout_version = 3` 属于不同编号，后者是既有数据布局标记。
+- 本版不提供 Windows 或 Linux 安装器。产品版本 `1.2.0` 与内部 `layout_version = 3` 属于不同编号，后者是既有数据布局标记。
 
 ## 手动执行
 
@@ -61,7 +62,7 @@ python3 src/install.py start
 
 上面的尖括号必须替换为真实参数。安装器保存本机 Python 绝对路径、用户目录和 session ID，不使用发行包制作电脑的配置。
 
-安装后的定位入口不受 session 改名影响：
+Agent 每轮接手先定位，再读取返回的项目导航异常区，随后读取本 session 的说明与工作索引。复制失败或待恢复时定位返回错误及导航路径，禁止建立同名空目录冒充完成。安装后的定位入口不受 session 改名影响：
 
 ```sh
 python3 "$HOME/Library/Application Support/CodexSessionMirror/session_mirror.py" --locate

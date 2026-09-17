@@ -17,6 +17,7 @@ import time
 import unicodedata
 import session_layout as layout
 import archive_store
+import fork_workspace
 
 MARKER = '.codex-session-mirror.json'
 OWNER = 'codex-session-mirror-v1'
@@ -131,6 +132,8 @@ def read_inventory(home):
 
 class Mirror:
     file_signature = staticmethod(signature)
+    write_json = staticmethod(atomic_json)
+    directory_name = staticmethod(safe_name)
 
     def __init__(self, home, state_dir, seed_ids=(), grace=15):
         self.home = Path(home).resolve()
@@ -226,6 +229,8 @@ class Mirror:
         else:
             dest = self.pick_directory(base, record['display_name'], sid)
             if old_marker and old_marker.get('layout_version') == 3 and dest != old:
+                if record['archived'] and old.parent != base:
+                    entry['archive_origin_directory'] = str(old)
                 entry['pending_move'] = {'mode': 'whole_workspace', 'old': str(old), 'destination': str(dest), 'key': key}
                 self.save()
                 self.recover_move(sid, entry)
@@ -305,16 +310,22 @@ class Mirror:
     def sync(self, record, now):
         sid = record['id']
         entry = self.state['sessions'].setdefault(sid, {})
+        record_changed = entry.get('name') != record['display_name'] or entry.get('source_path') != str(record['rollout_path'])
+        entry.update(id=sid, name=record['display_name'], source_path=str(record['rollout_path']), archived=bool(record['archived']))
+        if not entry.get('project_directory') or entry.get('recorded_cwd') != record['cwd']:
+            entry['project_directory'] = str(layout.project_root(record['cwd']))
+        fork_workspace.recover(self, sid, entry)
         archive_store.recover(self, sid, entry)
         self.recover_move(sid, entry)
         source = Path(record['rollout_path'])
         meta = self.validate_source(source, sid)
+        fork_workspace.initialize(self, record, entry, meta, source, now)
         before = signature(source)
         if entry.get('archive_path'):
             archive = Path(entry['archive_path'])
             if archive.is_symlink() or not archive.is_file():
                 raise RuntimeError('Session archive unavailable; refusing an empty replacement')
-            if (record['archived'] and entry.get('name') == record['display_name']
+            if (not record_changed and record['archived'] and entry.get('name') == record['display_name']
                     and entry.get('recorded_cwd') == record['cwd']
                     and entry.get('source_path') == str(source)
                     and entry.get('source_signature') == before
@@ -334,6 +345,7 @@ class Mirror:
         entry.update({'name': record['display_name'], 'source_path': str(source), 'archived': bool(record['archived']),
                       'forked_from_id': meta.get('forked_from_id'), 'status': 'synced'})
         entry.pop('error', None)
+        entry.pop('error_at', None)
         entry.pop('missing_since', None)
         marker.update({'source_path': str(source), 'session_name': entry['name'], 'archived': entry['archived'],
                        'sha256': entry.get('sha256'), 'last_synced_at': entry.get('last_synced_at'), 'status': 'synced'})
@@ -362,6 +374,7 @@ class Mirror:
         return ids
 
     def remove(self, sid, entry):
+        fork_workspace.recover(self, sid, entry)
         archive_store.recover(self, sid, entry)
         if entry.get('archive_path'):
             archive_store.restore(self, sid, entry)
@@ -417,7 +430,7 @@ class Mirror:
                 try:
                     self.sync(record, now)
                 except (OSError, ValueError, RuntimeError) as error:
-                    self.state['sessions'].setdefault(sid, {}).update({'status': 'retry', 'error': str(error)})
+                    self.state['sessions'].setdefault(sid, {}).update({'status': 'retry', 'error': str(error), 'error_at': now})
                     LOG.warning('Session %s: %s', sid, error)
         missing = [(sid, e) for sid, e in self.state['sessions'].items() if sid not in all_ids and (e.get('status') != 'source_deleted' or e.get('archive_job'))]
         if missing:
@@ -432,7 +445,7 @@ class Mirror:
                         if self.remove(sid, entry):
                             del self.state['sessions'][sid]
                     except (OSError, ValueError, RuntimeError) as error:
-                        entry.update({'status': 'retry', 'error': str(error)})
+                        entry.update({'status': 'retry', 'error': str(error), 'error_at': now})
         projects.update(e['project_directory'] for e in self.state['sessions'].values() if e.get('project_directory'))
         self.state['navigation_errors'] = {}
         for project in projects:
@@ -444,6 +457,18 @@ class Mirror:
                 LOG.warning('Project navigation: %s', error)
         self.state.update({'last_scan_at': now, 'layout_version': 3})
         self.state.pop('scan_error', None)
+        self.save()
+
+
+    def report_scan_error(self, error):
+        self.state['scan_error'] = str(error)
+        projects = {e['project_directory'] for e in self.state['sessions'].values() if e.get('project_directory')}
+        for project in projects:
+            try:
+                entries = [(sid, e) for sid, e in self.state['sessions'].items() if e.get('project_directory') == project]
+                layout.update_project_index(Path(project), entries, scan_error=str(error))
+            except (OSError, ValueError):
+                LOG.exception('Unable to write project scan error')
         self.save()
 
 
@@ -472,13 +497,22 @@ def main():
             statefile = args.state_dir / 'state.json'
             state = json.loads(statefile.read_text()) if statefile.exists() else {}
             entry = state.get('sessions', {}).get(args.session_id, {})
+            project = entry.get('project_directory')
+            diagnostics = {'navigation': str(Path(project) / '项目导航.md') if project else None,
+                           'last_scan_at': state.get('last_scan_at'), 'scan_error': state.get('scan_error'),
+                           'error': entry.get('error'), 'fork_state': entry.get('fork_state'),
+                           'fork_warnings': entry.get('fork_warnings', [])}
+            if entry.get('status') == 'retry' or entry.get('fork_job'):
+                print(json.dumps(dict(diagnostics, session_id=args.session_id, directory=None,
+                                      status=entry.get('status', 'retry'), action='Read project navigation before proceeding; do not create an empty replacement workspace.'), ensure_ascii=False))
+                return
             if entry.get('archive_path') and not entry.get('archive_job') and Path(entry['archive_path']).is_file():
-                print(json.dumps({'session_id': args.session_id, 'directory': None,
+                print(json.dumps({**diagnostics, 'session_id': args.session_id, 'directory': None,
                                   'archive': entry['archive_path'], 'status': entry.get('status'),
                                   'archived': True, 'action': 'Unarchive the session in Codex to restore its workspace.'}, ensure_ascii=False))
                 return
             if entry.get('layout_version') == 3 and entry.get('directory') and Path(entry['directory']).is_dir():
-                print(json.dumps({'session_id': args.session_id, 'directory': entry['directory'],
+                print(json.dumps({**diagnostics, 'session_id': args.session_id, 'directory': entry['directory'],
                                   'status': entry.get('status'), 'notes': str(Path(entry['directory']) / layout.NOTES),
                                   'work_index': str(Path(entry['directory']) / '工作/索引.md')}, ensure_ascii=False))
                 return
@@ -509,8 +543,7 @@ def main():
                 worker.tick()
             except (OSError, sqlite3.Error, ValueError, RuntimeError) as error:
                 LOG.exception('Scan failed; deletion not inferred')
-                worker.state['scan_error'] = str(error)
-                worker.save()
+                worker.report_scan_error(error)
                 if args.once:
                     raise
             if args.once:

@@ -78,7 +78,9 @@ class SessionWorkspaceTests(unittest.TestCase):
         self.worker.tick(2)
         self.assertEqual(self.dest(b), self.project / 'B')
         self.assertEqual(self.dest(child), self.project / 'A-fork')
-        self.assertFalse((self.dest(child) / '工作/only-in-A.txt').exists())
+        self.assertEqual((self.dest(child) / '工作/only-in-A.txt').read_text(), 'A')
+        (self.dest(child) / '工作/only-in-A.txt').write_text('child edit')
+        self.assertEqual((self.dest() / '工作/only-in-A.txt').read_text(), 'A')
         self.assert_copy(b, bs)
         self.assert_copy(child, cs)
         self.assertIn(self.sid, (self.dest(child) / m.layout.NOTES).read_text())
@@ -340,6 +342,10 @@ class SessionWorkspaceTests(unittest.TestCase):
         with self.source.open('ab') as f: f.write(b'{"during_downtime":true}\n')
         process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         wait(lambda: (renamed / m.layout.HISTORY).read_bytes() == self.source.read_bytes())
+        child, _ = self.add('background-child', parent=self.sid)
+        child_file = self.project / 'background-child/工作/output.txt'
+        wait(lambda: child_file.exists() and child_file.read_text() == 'artifact')
+        child_file.write_text('independent child edit')
         self.update(archived=1)
         archive = self.project / '已归档/renamed.zip'
         wait(lambda: archive.exists() and not renamed.exists())
@@ -350,6 +356,7 @@ class SessionWorkspaceTests(unittest.TestCase):
         self.delete()
         wait(lambda: not (renamed / m.layout.HISTORY).exists())
         self.assertEqual((renamed / '工作/output.txt').read_text(), 'artifact')
+        self.assertEqual(child_file.read_text(), 'independent child edit')
 
 
 if __name__ == '__main__':

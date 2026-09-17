@@ -28,3 +28,6 @@
 !/projects/codex-session-workspace/tests/test_install.py
 !/projects/codex-session-workspace/tests/test_session_mirror.py
 !/projects/codex-session-workspace/verify_package.py
+!/projects/codex-session-workspace/src/fork_workspace.py
+!/projects/codex-session-workspace/tests/test_fork_workspace.py
+!/projects/codex-session-workspace/docs/FORKING.md

@@ -1,6 +1,7 @@
 """A session owns one workspace. Narrative files remain agent/user maintained."""
 from datetime import datetime
 import hashlib
+import html
 import json
 import os
 from pathlib import Path
@@ -131,6 +132,26 @@ def replace_block(original, start, end, block):
     return original.rstrip() + '\n\n' + block + '\n'
 
 
+def plain_label(value):
+    text = html.escape(' '.join(str(value).splitlines()))
+    return re.sub(r'([\\`*_{}\[\]()#!|])', r'\\\1', text)
+
+
+def fork_status(entry):
+    parent = entry.get('forked_from_id')
+    if not parent:
+        return ''
+    line = '- 分叉来源 ID：`' + str(parent) + '`'
+    if entry.get('fork_state') == 'complete':
+        when = datetime.fromtimestamp(entry['fork_snapshot_at']).strftime('%Y-%m-%d %H:%M:%S')
+        line += '；已一次性复制父工作区，之后独立维护。\n- 工作区复制时间：' + when
+    else:
+        line += '；既有工作区保留，未追溯补拷父文件。'
+    if entry.get('fork_warnings'):
+        line += '\n- 引用检查：以下文件可能仍指向父目录，未自动改写：' + '、'.join(plain_label(p) for p in entry['fork_warnings'])
+    return line + '\n'
+
+
 def update_status(entry):
     directory = plain_dir(entry['directory'])
     doc = directory / NOTES
@@ -147,7 +168,7 @@ def update_status(entry):
     name = ' '.join(str(entry.get('name', entry['id'])).splitlines())
     block = (STATUS_START + '\n\n## 同步信息（自动维护）\n\n'
              + f'- 会话：{name}\n- 会话 ID：`{entry["id"]}`\n- 状态：{state}\n- 最后同步：{when}\n- {history}\n'
-             + (f'- 分叉来源 ID：`{entry["forked_from_id"]}`；本目录独立维护，父会话文件不自动复制。\n' if entry.get('forked_from_id') else '')
+             + fork_status(entry)
              + '\n' + STATUS_END)
     atomic_text(doc, replace_block(original, STATUS_START, STATUS_END, block))
 
@@ -194,7 +215,7 @@ def remove_empty_scaffold(directory):
     return True
 
 
-def update_project_index(project, entries):
+def update_project_index(project, entries, scan_error=None):
     project = plain_dir(project)
     path = project / '项目导航.md'
     if path.is_symlink():
@@ -203,7 +224,18 @@ def update_project_index(project, entries):
     # Replace only the prior version's machine-owned task list, never human prose.
     original = re.sub(r'<!-- codex-session-mirror:tasks:start -->.*?<!-- codex-session-mirror:tasks:end -->', '', original, flags=re.S)
     rows = []
+    issues = []
+    if scan_error:
+        issues.append('- **全局同步异常**：' + plain_label(scan_error) + '。先检查同步服务，当前导航可能不是最新状态。')
     for sid, entry in sorted(entries, key=lambda pair: pair[1].get('last_synced_at', 0), reverse=True):
+        if entry.get('error') or entry.get('fork_job'):
+            label = '分叉复制失败或待恢复' if entry.get('fork_state') == 'pending' or entry.get('fork_job') else '同步失败'
+            issues.append('- **' + label + '**：' + plain_label(entry.get('name', sid))
+                          + '（ID：`' + sid + '`）— ' + plain_label(entry.get('error', '复制事务尚未完成'))
+                          + '。保留已有文件，先排查原因；不要创建同名空目录或覆盖重试。')
+        if entry.get('fork_warnings'):
+            issues.append('- **分叉引用待检查**：' + plain_label(entry.get('name', sid)) + ' — '
+                          + '、'.join(plain_label(p) for p in entry['fork_warnings']) + '。文件已复制，绝对路径或 Git 工作树引用未自动改写。')
         directory = Path(entry.get('directory', '/nonexistent'))
         archive = Path(entry['archive_path']) if entry.get('archive_path') else None
         if entry.get('layout_version') != 3 or (not directory.is_dir() and not (archive and archive.is_file())):
@@ -217,5 +249,5 @@ def update_project_index(project, entries):
         if not target.exists():
             continue
         rows.append('- ' + link(entry.get('name', sid), target.relative_to(project)) + ' — ' + state)
-    block = NAV_START + '\n\n## 会话入口\n\n' + ('\n'.join(rows) or '暂无已同步的会话。') + '\n\n' + NAV_END
+    block = NAV_START + '\n\n## 同步异常与待处理\n\n' + ('\n'.join(issues) or '当前没有已记录的同步异常。') + '\n\n## 会话入口\n\n' + ('\n'.join(rows) or '暂无已同步的会话。') + '\n\n' + NAV_END
     atomic_text(path, replace_block(original, NAV_START, NAV_END, block))

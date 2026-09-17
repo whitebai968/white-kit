@@ -82,14 +82,14 @@ def main():
             raise SystemExit('Use --backup-dir to keep the prior installed version before updating')
         backup = args.backup_dir / datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
         backup.mkdir(parents=True)
-        for file in [root / 'session_mirror.py', root / 'task_layout.py', root / 'session_layout.py', root / 'archive_store.py', root / 'install.py', root / 'README.md', owner, plist]:
+        for file in [root / 'session_mirror.py', root / 'task_layout.py', root / 'session_layout.py', root / 'archive_store.py', root / 'fork_workspace.py', root / 'install.py', root / 'README.md', owner, plist]:
             if file.exists():
                 shutil.copy2(file, backup / file.name)
     os.umask(0o077)
     state.mkdir(parents=True, exist_ok=True)
     plist.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(['launchctl', 'bootout', service], capture_output=True)
-    for name in ['session_mirror.py', 'session_layout.py', 'archive_store.py', 'install.py', 'README.md']:
+    for name in ['session_mirror.py', 'session_layout.py', 'archive_store.py', 'fork_workspace.py', 'install.py', 'README.md']:
         src, dst = source / name, root / name
         if src.resolve() != dst.resolve():
             shutil.copy2(src, dst)

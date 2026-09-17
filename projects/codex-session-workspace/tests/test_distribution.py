@@ -98,6 +98,8 @@ class MacPortabilityTests(unittest.TestCase):
             self.assertIn(str(target_home / 'Library/Application Support/CodexSessionMirror/session_mirror.py'), argv)
             self.assertTrue(any(call.args[0][:3] == ['launchctl', 'bootstrap', 'gui/777'] for call in run.call_args_list))
             self.assertIn(sid, argv)
+            installed_fork = target_home / 'Library/Application Support/CodexSessionMirror/fork_workspace.py'
+            self.assertEqual(installed_fork.read_bytes(), (Path(install.__file__).parent / 'fork_workspace.py').read_bytes())
             installed_archive = target_home / 'Library/Application Support/CodexSessionMirror/archive_store.py'
             self.assertEqual(installed_archive.read_bytes(), (Path(install.__file__).parent / 'archive_store.py').read_bytes())
 
