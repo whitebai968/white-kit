@@ -11,7 +11,7 @@ Personal extensions and tools for working with Codex.
 | 项目 | 用途 | 当前版本 | 平台 |
 | --- | --- | --- | --- |
 | [Codex Session Workspace](projects/codex-session-workspace/) | 按 session 同步历史与文件，完整分叉复制、ZIP 归档恢复和异常导航 | v1.2.0 | macOS · Python 3.9+ |
-| [white-skill](white-skill/) | 工作方法写作与领域建模的两个分享技能，附使用指南和安装包 | 分享版 | Codex |
+| [white-skill](white-skill/) | Agent 文档写作与领域建模的两个技能，共用安装指南 | 分享版 | 本地 Agent Skills |
 
 v1.2.0 新增：新分叉一次性复制父工作区，之后独立维护；同步失败原因直接显示在项目导航，供 Agent 接手时检查。详见 [分叉说明](projects/codex-session-workspace/docs/FORKING.md)。
 
