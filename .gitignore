@@ -31,3 +31,25 @@
 !/projects/codex-session-workspace/src/fork_workspace.py
 !/projects/codex-session-workspace/tests/test_fork_workspace.py
 !/projects/codex-session-workspace/docs/FORKING.md
+
+# white-skill public sharing files
+!/white-skill/
+!/white-skill/LICENSE
+!/white-skill/README.md
+!/white-skill/docs/
+!/white-skill/docs/domain-modeling-guide.docx
+!/white-skill/docs/writing-for-agents-guide.docx
+!/white-skill/domain-modeling/
+!/white-skill/domain-modeling/ADR-FORMAT.md
+!/white-skill/domain-modeling/CONTEXT-FORMAT.md
+!/white-skill/domain-modeling/SKILL.md
+!/white-skill/domain-modeling/agents/
+!/white-skill/domain-modeling/agents/openai.yaml
+!/white-skill/packages/
+!/white-skill/packages/domain-modeling.zip
+!/white-skill/packages/writing-for-agents.zip
+!/white-skill/writing-for-agents/
+!/white-skill/writing-for-agents/SKILL-MECHANICS.md
+!/white-skill/writing-for-agents/SKILL.md
+!/white-skill/writing-for-agents/agents/
+!/white-skill/writing-for-agents/agents/openai.yaml
