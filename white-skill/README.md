@@ -9,7 +9,25 @@
 
 ## 安装与使用
 
-下载对应 ZIP，解压后按照包内的安装与使用说明安装完整技能文件夹。每份 Word 文档包括三分钟产品介绍稿和操作步骤。
+先安装 [Node.js](https://nodejs.org/en/download)，然后在终端运行需要的命令。以下安装到 Codex 个人技能目录，Mac 和 Windows 使用同一条命令。
+
+Writing for Agents：
+
+```bash
+npx skills add https://github.com/whitebai968/white-kit/tree/main/white-skill --skill writing-for-agents -g -a codex
+```
+
+Domain Modeling：
+
+```bash
+npx skills add https://github.com/whitebai968/white-kit/tree/main/white-skill --skill domain-modeling -g -a codex
+```
+
+已有同名技能时先备份并按提示选择版本。安装后打开新的 Codex 会话，输入 `$writing-for-agents` 或 `$domain-modeling`，再写你的具体任务。未识别时重启 Codex。
+
+也可以下载表格中的 ZIP，按包内安装说明手动复制完整技能文件夹。每份 Word 文档都包含三分钟产品介绍稿、GitHub 安装命令、手动安装步骤与可复制的使用示例。
+
+安装器与命令参数说明见 [skills CLI](https://github.com/vercel-labs/skills)。
 
 ## 来源与版本
 
